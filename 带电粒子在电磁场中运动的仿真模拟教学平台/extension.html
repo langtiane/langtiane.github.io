@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>三维电磁场模拟器</title>
+    <style>
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; }
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 8px;
+            width: 320px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .control-group { margin-bottom: 15px; }
+        input[type="range"] { width: 100%; }
+        label { display: block; margin: 5px 0; }
+        .particle-control { 
+            margin: 10px 0; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            background: rgba(245,245,245,0.8);
+        }
+        .axis-control { display: flex; gap: 5px; }
+        .axis-control input { width: 70px; }
+        
+        /* 美化按钮 */
+        button {
+            margin: 2px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            outline: none;
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+        }
+        
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        /* 按钮颜色方案 */
+        button { background-color: #f1f5f9; color: #334155; }
+        button:hover { background-color: #e2e8f0; }
+        
+        /* 功能按钮 */
+        #pauseBtn { background-color: #3b82f6; color: white; }
+        #pauseBtn:hover { background-color: #2563eb; }
+        
+        button[onclick^="setCameraView"] { background-color: #10b981; color: white; }
+        button[onclick^="setCameraView"]:hover { background-color: #059669; }
+        
+        button[onclick="addParticle()"] { background-color: #8b5cf6; color: white; }
+        button[onclick="addParticle()"]:hover { background-color: #7c3aed; }
+        
+        button[onclick="resetParticles()"] { background-color: #ef4444; color: white; }
+        button[onclick="resetParticles()"]:hover { background-color: #dc2626; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div class="control-group">
+            <button id="pauseBtn">暂停</button>
+            <button onclick="setCameraView('front')">正视图</button>
+            <button onclick="setCameraView('top')">俯视图</button>
+            <button onclick="setCameraView('side')">侧视图</button>
+        </div>
+
+        <div class="control-group">
+            <h3>电场控制 (V/m)</h3>
+            <div class="axis-control">
+                <label>X: <input type="number" id="Ex" value="0" step="1"></label>
+                <label>Y: <input type="number" id="Ey" value="0" step="1"></label>
+                <label>Z: <input type="number" id="Ez" value="0" step="1"></label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>磁场控制 (T)</h3>
+            <div class="axis-control">
+                <label>X: <input type="number" id="Bx" value="0" step="0.1"></label>
+                <label>Y: <input type="number" id="By" value="0" step="0.1"></label>
+                <label>Z: <input type="number" id="Bz" value="0" step="0.1"></label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>粒子控制</h3>
+            <div id="particles-container">
+                <div class="particle-control">
+                    <h4>粒子 1</h4>
+                    <label>质量 (kg): <input type="number" class="mass" value="1" step="0.1"></label>
+                    <label>电荷 (C): <input type="number" class="charge" value="1" step="0.1"></label>
+                    <div class="position-control">
+                        <h5>初始位置</h5>
+                        <label>X: <input type="number" class="posX" value="0" step="1"></label>
+                        <label>Y: <input type="number" class="posY" value="0" step="1"></label>
+                        <label>Z: <input type="number" class="posZ" value="0" step="1"></label>
+                    </div>
+                    <div class="velocity-control">
+                        <h5>初速度 (m/s)</h5>
+                        <label>X: <input type="number" class="vx" value="0" step="1"></label>
+                        <label>Y: <input type="number" class="vy" value="0" step="1"></label>
+                        <label>Z: <input type="number" class="vz" value="0" step="1"></label>
+                    </div>
+                </div>
+            </div>
+            <button onclick="addParticle()">添加粒子</button>
+            <button onclick="resetParticles()">重置粒子</button>
+        </div>
+
+        <div class="control-group">
+            <h3>显示选项</h3>
+            <label><input type="checkbox" id="showTrails" checked> 轨迹</label>
+            <label><input type="checkbox" id="showEForce" checked> 电场力</label>
+            <label><input type="checkbox" id="showBForce" checked> 磁场力</label>
+            <label>力缩放: <input type="number" id="forceScale" value="0.1" step="0.1"></label>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        let scene, camera, renderer, controls;
+        let particleSystem; // 改为单一粒子系统
+        let electricField = new THREE.Vector3();
+        let magneticField = new THREE.Vector3();
+        const TRAIL_LENGTH = 80000;
+        let isPaused = false;
+        let lastTime = 0;
+
+        // 轴标签辅助函数
+        function createAxisLabel(text, color, position) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = 'Bold 20px Arial';
+            context.fillStyle = color;
+            context.fillText(text, 0, 20);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(2, 1, 1);
+            sprite.position.copy(position);
+            return sprite;
+        }
+
+        class ParticleSystem {
+            constructor() {
+                this.particles = [];
+                this.trails = new THREE.Group();
+                scene.add(this.trails);
+            }
+
+            addParticle(config) {
+                const particle = new Particle(config);
+                this.particles.push(particle);
+                scene.add(particle.mesh);
+                scene.add(particle.eForceArrow); // 添加电场力箭头到场景
+                scene.add(particle.bForceArrow); // 添加磁场力箭头到场景
+                this.trails.add(particle.trail);
+                return particle;
+            }
+
+            update(deltaTime) {
+                if(isPaused) return;
+                this.particles.forEach(particle => {
+                    particle.update(deltaTime, electricField, magneticField);
+                });
+            }
+
+            reset() {
+                this.particles.forEach(particle => {
+                    scene.remove(particle.mesh);
+                    scene.remove(particle.trail);
+                    scene.remove(particle.eForceArrow);
+                    scene.remove(particle.bForceArrow);
+                });
+                this.particles = [];
+                this.trails.clear();
+            }
+        }
+
+        class Particle {
+            constructor(config) {
+                this.mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.3, 16, 16),
+                    new THREE.MeshPhongMaterial({
+                        color: config.charge > 0 ? 0xff4444 : 0x4444ff,
+                        shininess: 100
+                    })
+                );
+                this.mesh.position.set(config.x, config.y, config.z);
+
+                this.velocity = new THREE.Vector3(config.vx, config.vy, config.vz);
+                this.charge = config.charge;
+                this.mass = config.mass;
+                this.trail = this.createTrail();
+                this.trailPoints = [];
+                
+                this.eForceArrow = this.createForceArrow(0xff0000);
+                this.bForceArrow = this.createForceArrow(0x0000ff);
+            }
+
+            createForceArrow(color) {
+                return new THREE.ArrowHelper(
+                    new THREE.Vector3(),
+                    new THREE.Vector3(),
+                    0,
+                    color
+                );
+            }
+
+            createTrail() {
+                const geometry = new THREE.BufferGeometry();
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0x00ff00,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                return new THREE.Line(geometry, material);
+            }
+
+            update(deltaTime, E, B) {
+                if (this.mass === 0) return;
+
+                const q = this.charge;
+                const m = this.mass;
+                const dt = deltaTime;
+                
+                // Boris算法实现 - 确保v×B计算正确
+                const half_dt = dt / 2;
+                const q_over_m = q / m;
+                
+                // 第一步：电场力的半时间步
+                const v_minus = this.velocity.clone().add(
+                    E.clone().multiplyScalar(q_over_m * half_dt)
+                );
+                
+                // 第二步：磁场旋转 (v×B)
+                const t = B.clone().multiplyScalar(q_over_m * half_dt);
+                const s = t.clone().multiplyScalar(2 / (1 + t.lengthSq()));
+                
+                const v_prime = v_minus.clone().add(
+                    v_minus.clone().cross(t)
+                );
+                
+                const v_plus = v_minus.clone().add(
+                    v_prime.clone().cross(s)
+                );
+                
+                // 第三步：另一个电场力的半时间步
+                const v_new = v_plus.clone().add(
+                    E.clone().multiplyScalar(q_over_m * half_dt)
+                );
+
+                // 更新位置和速度
+                this.mesh.position.add(v_new.clone().multiplyScalar(dt));
+                this.velocity.copy(v_new);
+
+                // 更新显示元素
+                this.updateForceArrows(E, B);
+                this.updateTrail();
+            }
+
+            updateForceArrows(E, B) {
+                const scale = parseFloat(document.getElementById('forceScale').value);
+                
+                // 电场力 (F = qE)
+                const F_e = E.clone().multiplyScalar(this.charge);
+                this.updateArrow(this.eForceArrow, F_e, scale, 
+                    document.getElementById('showEForce').checked);
+
+                // 磁场力 (F = q(v×B)) - 使用正确的叉乘顺序
+                const F_b = new THREE.Vector3().crossVectors(this.velocity, B).multiplyScalar(this.charge);
+                this.updateArrow(this.bForceArrow, F_b, scale, 
+                    document.getElementById('showBForce').checked);
+            }
+
+            updateArrow(arrow, force, scale, visible) {
+                arrow.visible = visible;
+                if(!visible) return;
+
+                arrow.setDirection(force.clone().normalize());
+                arrow.setLength(force.length() * scale);
+                arrow.position.copy(this.mesh.position);
+            }
+
+            updateTrail() {
+                this.trailPoints.push(this.mesh.position.clone());
+                if (this.trailPoints.length > TRAIL_LENGTH) {
+                    this.trailPoints.shift();
+                }
+
+                const positions = new Float32Array(this.trailPoints.length * 3);
+                this.trailPoints.forEach((point, i) => {
+                    positions[i*3] = point.x;
+                    positions[i*3+1] = point.y;
+                    positions[i*3+2] = point.z;
+                });
+
+                this.trail.geometry.setAttribute(
+                    'position',
+                    new THREE.BufferAttribute(positions, 3)
+                );
+                this.trail.geometry.attributes.position.needsUpdate = true;
+                this.trail.visible = document.getElementById('showTrails').checked;
+            }
+        }
+
+        // 初始化场景
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xeeeeee);
+
+            // 初始相机位置 - 绕x轴旋转90度，再绕z轴旋转90度
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.set(30, 0, 0); // 从x轴正向看向原点
+            camera.lookAt(0, 0, 0); // 看向原点
+            camera.up.set(0, 0, 1); // 设置z轴为上方
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // 配置OrbitControls以允许自由旋转
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.enableZoom = true;
+            controls.rotateSpeed = 0.5;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.enablePan = true;
+            
+            // 允许完全自由旋转
+            controls.minPolarAngle = 0;
+            controls.maxPolarAngle = Math.PI;
+            controls.minAzimuthAngle = -Infinity;
+            controls.maxAzimuthAngle = Infinity;
+
+            // 照明和坐标轴
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const light = new THREE.DirectionalLight(0xffffff, 0.8);
+            light.position.set(10, 10, 10);
+            scene.add(light);
+            
+            // 创建带标签的坐标轴
+            const axesHelper = new THREE.AxesHelper(20);
+            scene.add(axesHelper);
+            
+            // 添加轴标签
+            scene.add(createAxisLabel('X', 'red', new THREE.Vector3(22, 0, 0)));
+            scene.add(createAxisLabel('Y', 'green', new THREE.Vector3(0, 22, 0)));
+            scene.add(createAxisLabel('Z', 'blue', new THREE.Vector3(0, 0, 22)));
+
+            setupEventListeners();
+            particleSystem = new ParticleSystem(); // 初始化单一粒子系统
+            createDefaultParticle();
+        }
+
+        function setupEventListeners() {
+            // 场强绑定
+            ['Ex','Ey','Ez','Bx','By','Bz'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateFields);
+            });
+
+            document.getElementById('pauseBtn').addEventListener('click', () => {
+                isPaused = !isPaused;
+                document.getElementById('pauseBtn').textContent = isPaused ? '继续' : '暂停';
+            });
+
+            // 添加显示选项的事件监听
+            ['showTrails', 'showEForce', 'showBForce', 'forceScale'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateDisplayOptions);
+            });
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function updateDisplayOptions() {
+            particleSystem.particles.forEach(particle => {
+                particle.trail.visible = document.getElementById('showTrails').checked;
+                particle.eForceArrow.visible = document.getElementById('showEForce').checked;
+                particle.bForceArrow.visible = document.getElementById('showBForce').checked;
+            });
+        }
+
+        function createDefaultParticle() {
+            addParticle({
+                x: 0, y: 0, z: 0,
+                vx: 0, vy: 0, vz: 0,
+                charge: 1,
+                mass: 1
+            });
+        }
+
+        function addParticle(config = null) {
+            if (!config) {
+                const particleElem = document.querySelector('.particle-control');
+                config = {
+                    x: parseFloat(particleElem.querySelector('.posX').value),
+                    y: parseFloat(particleElem.querySelector('.posY').value),
+                    z: parseFloat(particleElem.querySelector('.posZ').value),
+                    vx: parseFloat(particleElem.querySelector('.vx').value),
+                    vy: parseFloat(particleElem.querySelector('.vy').value),
+                    vz: parseFloat(particleElem.querySelector('.vz').value),
+                    charge: parseFloat(particleElem.querySelector('.charge').value),
+                    mass: parseFloat(particleElem.querySelector('.mass').value)
+                };
+            }
+            
+            particleSystem.addParticle(config);
+        }
+
+        function resetParticles() {
+            particleSystem.reset();
+        }
+
+        function updateFields() {
+            electricField.set(
+                parseFloat(document.getElementById('Ex').value),
+                parseFloat(document.getElementById('Ey').value),
+                parseFloat(document.getElementById('Ez').value)
+            );
+            magneticField.set(
+                parseFloat(document.getElementById('Bx').value),
+                parseFloat(document.getElementById('By').value),
+                parseFloat(document.getElementById('Bz').value)
+            );
+        }
+
+        function setCameraView(view) {
+            const views = {
+                front: { pos: [30, 0, 0], lookAt: [0, 0, 0], up: [0, 0, 1] }, // 从x轴正向看向原点，z轴朝上
+                top: { pos: [0, 0, 30], lookAt: [0, 0, 0], up: [0, 1, 0] }, // 从z轴正向俯视，y轴朝上
+                side: { pos: [0, 30, 0], lookAt: [0, 0, 0], up: [0, 0, 1] } // 从y轴正向看向原点，z轴朝上
+            };
+            const cfg = views[view];
+            camera.position.fromArray(cfg.pos);
+            camera.up.fromArray(cfg.up);
+            camera.lookAt(cfg.lookAt[0], cfg.lookAt[1], cfg.lookAt[2]);
+            controls.update();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            
+            const now = performance.now();
+            const deltaTime = lastTime ? Math.min((now - lastTime)/1000, 0.033) : 0;
+            lastTime = now;
+
+            if(!isPaused) {
+                const steps = Math.ceil(deltaTime / 0.002);
+                const stepDT = deltaTime / steps;
+                for(let i=0; i<steps; i++){
+                    particleSystem.update(stepDT);
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // 启动
+        init();
+        animate();
+    </script>
+</body>
+</html>

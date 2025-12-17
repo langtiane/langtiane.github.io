@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>多粒子电磁场模拟器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        neutral: '#1F2937',
+                        'neutral-light': '#F3F4F6',
+                        'electric-force': '#EF4444',
+                        'magnetic-force': '#3B82F6',
+                        'total-force': '#10B981',
+                        'velocity': '#06B6D4',
+                        'positive-charge': '#EF4444',
+                        'negative-charge': '#3B82F6'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'control': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'canvas': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'button': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .control-panel {
+                @apply bg-white rounded-xl shadow-control p-6 transition-all duration-300 hover:shadow-lg;
+            }
+            .simulation-canvas {
+                @apply bg-white rounded-xl shadow-canvas border-0 transition-all duration-300;
+            }
+            .control-group {
+                @apply mb-6 pb-6 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0;
+            }
+            .control-label {
+                @apply block text-sm font-medium text-gray-700 mb-2;
+            }
+            .control-input {
+                @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200;
+            }
+            .control-slider {
+                @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+            }
+            .control-slider::-webkit-slider-thumb {
+                @apply appearance-none w-5 h-5 rounded-full bg-primary shadow-sm cursor-pointer transition-all duration-200 hover:bg-primary/80;
+            }
+            .control-button {
+                @apply px-4 py-2 bg-primary text-white rounded-md shadow-button transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-95;
+            }
+            .data-panel {
+                @apply bg-neutral-light rounded-lg p-4 mt-6;
+            }
+            .particle-control {
+                @apply p-4 border border-gray-200 rounded-lg mb-4 bg-gray-50 transition-all duration-200 hover:bg-white;
+            }
+            .force-arrow {
+                @apply transition-all duration-200;
+            }
+            .grid-line {
+                @apply stroke-gray-200 stroke-0.5;
+            }
+            .electric-field {
+                @apply fill-electric-force;
+            }
+            .magnetic-field {
+                @apply fill-magnetic-force;
+            }
+            .velocity-indicator {
+                @apply fill-velocity;
+            }
+            .positive-charge {
+                @apply fill-positive-charge;
+            }
+            .negative-charge {
+                @apply fill-negative-charge;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            /* 新增背景控制样式 */
+            .background-control {
+                @apply mt-4 p-4 bg-white rounded-lg shadow-control flex items-center gap-4;
+            }
+            .background-preview {
+                @apply w-16 h-16 border border-gray-200 rounded-md overflow-hidden;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-neutral">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <header class="mb-4">
+            <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-neutral mb-2 flex items-center">
+                <i class="fa-solid fa-magnet text-primary mr-3"></i>
+                多粒子电磁场模拟器
+            </h1>
+            <p class="text-gray-600 max-w-3xl">探索带电粒子在电磁场中的运动规律，通过调整参数观察不同条件下的物理现象。</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 左侧主内容区域 - 固定不动 -->
+            <div class="lg:w-2/3">
+                <!-- 模拟器画布区域 -->
+                <div class="sticky top-6 bg-white rounded-xl shadow-canvas overflow-hidden">
+                    <div class="p-4 bg-neutral-light border-b border-gray-200 flex justify-between items-center">
+                        <h2 class="font-semibold text-lg text-neutral">模拟区域</h2>
+                        <div class="text-sm text-gray-600">
+                            <span class="inline-flex items-center mr-4">
+                                <span class="w-3 h-3 rounded-full bg-positive-charge inline-block mr-1"></span>
+                                正电荷
+                            </span>
+                            <span class="inline-flex items-center mr-4">
+                                <span class="w-3 h-3 rounded-full bg-negative-charge inline-block mr-1"></span>
+                                负电荷
+                            </span>
+                            <span class="inline-flex items-center">
+                                <span class="w-3 h-3 rounded-full bg-neutral inline-block mr-1"></span>
+                                速度方向
+                            </span>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <canvas id="simCanvas" class="simulation-canvas w-full" width="1000" height="800"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧控制面板区域 - 可滚动 -->
+            <div class="lg:w-1/3 h-[calc(100vh-100px)] overflow-y-auto pr-2 scrollbar-hide">
+                <div class="space-y-6">
+                    <!-- 粒子控制面板 -->
+                    <div class="control-panel">
+                        <h3 class="text-lg font-medium text-neutral mb-4 flex items-center">
+                            <i class="fa-solid fa-particle-circle-plus text-primary mr-2"></i>
+                            粒子控制
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="control-label">粒子数量:</label>
+                                <input type="number" id="particleCount" min="1" max="5" value="1" step="1" class="control-input">
+                            </div>
+                            <div id="particles-container">
+                                <!-- 粒子控件将动态生成在这里 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新增背景控制面板 -->
+                    <div class="control-panel background-control">
+                        <h3 class="text-lg font-medium text-neutral flex items-center">
+                            <i class="fa-solid fa-image text-primary mr-2"></i>
+                            背景图片
+                        </h3>
+                        <input type="file" id="bgImageInput" accept="image/png" class="sr-only">
+                        <label for="bgImageInput" class="control-button flex-1">
+                            <i class="fa-solid fa-file-image mr-1"></i> 选择PNG背景
+                        </label>
+                        <div id="bgPreview" class="background-preview"></div>
+                    </div>
+
+                    <!-- 显示选项 -->
+                    <div class="control-panel">
+                        <h3 class="text-lg font-medium text-neutral mb-4 flex items-center">
+                            <i class="fa-solid fa-eye text-primary mr-2"></i>
+                            显示选项
+                        </h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="showVelocity" checked class="w-4 h-4 text-primary focus:ring-primary/50 border-gray-300 rounded">
+                                <span class="ml-2 text-sm text-gray-700">显示速度方向（黑色箭头）</span>
+                            </label>
+                            
+                            <div class="force-controls mt-4">
+                                <h4 class="font-medium text-gray-700 mb-2">力显示选项:</h4>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="showElectricForce" checked class="w-4 h-4 text-electric-force focus:ring-electric-force/50 border-gray-300 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">电场力（红色箭头）</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="showMagneticForce" checked class="w-4 h-4 text-magnetic-force focus:ring-magnetic-force/50 border-gray-300 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">磁场力（蓝色箭头）</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="showTotalForce" checked class="w-4 h-4 text-total-force focus:ring-total-force/50 border-gray-300 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">合力（绿色箭头）</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <label class="control-label">力箭头比例（像素/牛顿）:</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="forceScale" value="5" min="0.1" max="1000" step="0.1" class="control-input w-24">
+                                    <input type="range" id="forceScaleSlider" min="0.1" max="1000" step="0.1" value="5" class="control-slider">
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <label class="control-label">缩放倍数:</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="zoomFactor" value="1" min="0.1" max="500" step="0.1" class="control-input w-24">
+                                    <input type="range" id="zoomSlider" min="0.1" max="100" step="0.1" value="1" class="control-slider">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 电场控制 -->
+                    <div class="control-panel">
+                        <h3 class="text-lg font-medium text-neutral mb-4 flex items-center">
+                            <i class="fa-solid fa-bolt text-primary mr-2"></i>
+                            电场控制
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="control-label">强度 (E):</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="electricField" value="0" step="10" class="control-input w-24">
+                                    <span class="text-sm text-gray-500">N/C</span>
+                                    <input type="range" id="electricSlider" min="0" max="100" value="0" class="control-slider">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="control-label">方向角度 (度):</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="electricAngle" value="90" min="0" max="360" step="1" class="control-input w-24">
+                                    <input type="range" id="electricAngleSlider" min="0" max="360" step="1" value="90" class="control-slider">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 磁场控制 -->
+                    <div class="control-panel">
+                        <h3 class="text-lg font-medium text-neutral mb-4 flex items-center">
+                            <i class="fa-solid fa-magnet text-primary mr-2"></i>
+                            磁场控制
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="control-label">强度 (B):</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="magneticField" value="0" step="0.1" class="control-input w-24">
+                                    <span class="text-sm text-gray-500">T</span>
+                                    <input type="range" id="magneticSlider" min="0" max="10" step="0.1" value="0" class="control-slider">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="control-label">方向:</label>
+                                <select id="magneticDirection" class="control-input">
+                                    <option value="in">向内</option>
+                                    <option value="out">向外</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 数据面板 -->
+                    <div class="control-panel">
+                        <h4 class="font-medium text-neutral mb-3 flex items-center">
+                            <i class="fa-solid fa-chart-line text-primary mr-2"></i>
+                            实时数据
+                        </h4>
+                        <div id="particles-data" class="text-sm text-gray-700 space-y-2"></div>
+                    </div>
+
+                    <!-- 模拟控制按钮 - 移至右侧底部 -->
+                    <div class="control-panel">
+                        <h3 class="text-lg font-medium text-neutral mb-4 flex items-center">
+                            <i class="fa-solid fa-play-circle text-primary mr-2"></i>
+                            模拟控制
+                        </h3>
+                        <div class="flex flex-col gap-4">
+                            <div class="flex gap-2">
+                                <button id="pauseBtn" class="control-button flex-1">
+                                    <i class="fa-solid fa-pause mr-1"></i> 暂停
+                                </button>
+                                <button id="resetBtn" class="control-button bg-gray-600 hover:bg-gray-700 flex-1">
+                                    <i class="fa-solid fa-refresh mr-1"></i> 重置
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <label class="text-sm text-gray-600 flex-1">时间缩放:</label>
+                                <input type="number" id="timeScale" value="1" step="0.1" class="control-input w-24">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>多粒子电磁场模拟器 | 使用 HTML5 Canvas 和 JavaScript 构建</p>
+        </footer>
+    </div>
+
+<script>
+class ParticleSimulator {
+    constructor() {
+        this.canvas = document.getElementById('simCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.particles = [];
+        this.setupEventListeners();
+        this.initSimulation();
+        this.lastTime = performance.now();
+        this.isPaused = false;
+        this.animationId = null;
+        this.showVelocity = true;
+        this.showElectricForce = true;
+        this.showMagneticForce = true;
+        this.showTotalForce = true;
+        this.zoomFactor = 1;
+        this.currentForces = [];
+        this.viewport = { x: 500, y: 400, zoom: 1 };
+        
+        // 背景图片相关属性
+        this.bgImage = null;
+        this.bgX = 0;
+        this.bgY = 0;
+        this.bgScale = 1;
+        this.isDragging = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.initBackgroundControls();
+    }
+
+    initSimulation() {
+        this.fields = {
+            electric: {
+                magnitude: parseInt(document.getElementById('electricField').value),
+                angle: parseFloat(document.getElementById('electricAngle').value) * Math.PI / 180
+            },
+            magnetic: {
+                magnitude: parseFloat(document.getElementById('magneticField').value),
+                direction: document.getElementById('magneticDirection').value
+            }
+        };
+
+        this.settings = {
+            timeScale: parseFloat(document.getElementById('timeScale').value),
+            trailLength: 10000
+        };
+
+        this.updateParticles();
+    }
+
+    updateParticles() {
+        const count = parseInt(document.getElementById('particleCount').value);
+        const container = document.getElementById('particles-container');
+        
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const div = document.createElement('div');
+            div.className = 'particle-control';
+            div.innerHTML = `
+                <h4 class="font-medium text-gray-700 mb-3">粒子 ${i+1}</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">质量 (kg):</label>
+                        <input type="number" class="mass control-input" value="1" min="0.0000000000000000000000000000001" step="0.1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">电荷量 (C):</label>
+                        <input type="number" class="charge control-input" value="1" min="-10" step="0.1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">初始 X:</label>
+                        <input type="number" class="initX control-input" value="${500 + i*20}" step="10">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">初始 Y:</label>
+                        <input type="number" class="initY control-input" value="${400 + i*20}" step="10">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">初速度大小 (v₀):</label>
+                        <input type="number" class="initSpeed control-input" value="0" step="1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 block mb-1">初速度方向:</label>
+                        <input type="number" class="initAngle control-input" value="0" step="15">
+                        <span class="text-xs text-gray-500">度</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        this.particles = [];
+        document.querySelectorAll('.particle-control').forEach(control => {
+            const charge = parseFloat(control.querySelector('.charge').value);
+            const mass = parseFloat(control.querySelector('.mass').value);
+            const x = parseInt(control.querySelector('.initX').value);
+            const y = parseInt(control.querySelector('.initY').value);
+            const speed = parseFloat(control.querySelector('.initSpeed').value);
+            const angle = parseFloat(control.querySelector('.initAngle').value) * Math.PI / 180;
+            
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: speed * Math.cos(angle),
+                vy: -speed * Math.sin(angle),
+                charge: charge,
+                mass: mass,
+                trail: [],
+                element: control
+            });
+        });
+
+        this.bindParticleEvents();
+    }
+
+    setupEventListeners() {
+        document.getElementById('forceScaleSlider').addEventListener('input', (e) => {
+            document.getElementById('forceScale').value = e.target.value;
+        });
+        document.getElementById('forceScale').addEventListener('change', (e) => {
+            document.getElementById('forceScaleSlider').value = e.target.value;
+        });
+        
+        document.getElementById('electricSlider').addEventListener('input', (e) => {
+            document.getElementById('electricField').value = e.target.value;
+            this.fields.electric.magnitude = e.target.value;
+        });
+        document.getElementById('electricField').addEventListener('change', (e) => {
+            document.getElementById('electricSlider').value = e.target.value;
+            this.fields.electric.magnitude = e.target.value;
+        });
+
+        document.getElementById('electricAngleSlider').addEventListener('input', (e) => {
+            document.getElementById('electricAngle').value = e.target.value;
+            this.fields.electric.angle = parseFloat(e.target.value) * Math.PI / 180;
+        });
+        document.getElementById('electricAngle').addEventListener('change', (e) => {
+            document.getElementById('electricAngleSlider').value = e.target.value;
+            this.fields.electric.angle = parseFloat(e.target.value) * Math.PI / 180;
+        });
+
+        document.getElementById('magneticSlider').addEventListener('input', (e) => {
+            document.getElementById('magneticField').value = e.target.value;
+            this.fields.magnetic.magnitude = e.target.value;
+        });
+        document.getElementById('magneticField').addEventListener('change', (e) => {
+            document.getElementById('magneticSlider').value = e.target.value;
+            this.fields.magnetic.magnitude = e.target.value;
+        });
+        document.getElementById('magneticDirection').addEventListener('change', (e) => {
+            this.fields.magnetic.direction = e.target.value;
+        });
+
+        document.getElementById('showVelocity').addEventListener('change', (e) => {
+            this.showVelocity = e.target.checked;
+        });
+        document.getElementById('showElectricForce').addEventListener('change', (e) => {
+            this.showElectricForce = e.target.checked;
+        });
+        document.getElementById('showMagneticForce').addEventListener('change', (e) => {
+            this.showMagneticForce = e.target.checked;
+        });
+        document.getElementById('showTotalForce').addEventListener('change', (e) => {
+            this.showTotalForce = e.target.checked;
+        });
+
+        document.getElementById('zoomSlider').addEventListener('input', (e) => {
+            document.getElementById('zoomFactor').value = e.target.value;
+            this.zoomFactor = parseFloat(e.target.value);
+        });
+        document.getElementById('zoomFactor').addEventListener('change', (e) => {
+            document.getElementById('zoomSlider').value = e.target.value;
+            this.zoomFactor = parseFloat(e.target.value);
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            this.isPaused = !this.isPaused;
+            document.getElementById('pauseBtn').textContent = this.isPaused ? 
+                '<i class="fa-solid fa-play mr-1"></i> 继续' : 
+                '<i class="fa-solid fa-pause mr-1"></i> 暂停';
+            document.getElementById('pauseBtn').innerHTML = document.getElementById('pauseBtn').textContent;
+        });
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            this.resetParticles();
+        });
+        document.getElementById('timeScale').addEventListener('change', (e) => {
+            this.settings.timeScale = parseFloat(e.target.value);
+        });
+
+        document.getElementById('particleCount').addEventListener('change', () => {
+            this.updateParticles();
+        });
+    }
+
+    bindParticleEvents() {
+        document.querySelectorAll('.particle-control').forEach((control, index) => {
+            control.querySelector('.mass').addEventListener('change', (e) => {
+                this.particles[index].mass = parseFloat(e.target.value);
+            });
+            control.querySelector('.charge').addEventListener('change', (e) => {
+                this.particles[index].charge = parseFloat(e.target.value);
+            });
+            control.querySelector('.initX').addEventListener('change', (e) => {
+                this.particles[index].x = parseInt(e.target.value);
+            });
+            control.querySelector('.initY').addEventListener('change', (e) => {
+                this.particles[index].y = parseInt(e.target.value);
+            });
+            control.querySelector('.initSpeed').addEventListener('change', (e) => {
+                const speed = parseFloat(e.target.value);
+                const angle = parseFloat(control.querySelector('.initAngle').value) * Math.PI / 180;
+                this.particles[index].vx = speed * Math.cos(angle);
+                this.particles[index].vy = -speed * Math.sin(angle);
+            });
+            control.querySelector('.initAngle').addEventListener('change', (e) => {
+                const angle = parseFloat(e.target.value) * Math.PI / 180;
+                const speed = parseFloat(control.querySelector('.initSpeed').value);
+                this.particles[index].vx = speed * Math.cos(angle);
+                this.particles[index].vy = -speed * Math.sin(angle);
+            });
+        });
+    }
+
+    resetParticles() {
+        document.querySelectorAll('.particle-control').forEach((control, index) => {
+            const mass = parseFloat(control.querySelector('.mass').value);
+            const x = parseInt(control.querySelector('.initX').value);
+            const y = parseInt(control.querySelector('.initY').value);
+            const speed = parseFloat(control.querySelector('.initSpeed').value);
+            const angle = parseFloat(control.querySelector('.initAngle').value) * Math.PI / 180;
+            
+            this.particles[index] = {
+                ...this.particles[index],
+                x: x,
+                y: y,
+                mass: mass,
+                vx: speed * Math.cos(angle),
+                vy: -speed * Math.sin(angle),
+                trail: []
+            };
+        });
+    }
+
+    calculateForces(particle) {
+        const E = this.fields.electric.magnitude;
+        const angle = this.fields.electric.angle;
+        const Ex = E * Math.cos(angle);
+        const Ey = -E * Math.sin(angle);
+        
+        const fe = {
+            x: particle.charge * Ex,
+            y: particle.charge * Ey
+        };
+
+        const Bz = this.fields.magnetic.direction === 'out' ? 
+            this.fields.magnetic.magnitude : 
+            -this.fields.magnetic.magnitude;
+        const fb = {
+            x: Number((-particle.charge * particle.vy * Bz).toExponential(4)),
+            y: Number((particle.charge * particle.vx * Bz).toExponential(4))
+        };
+
+        return {
+            fe: fe,
+            fb: fb,
+            total: { x: fe.x + fb.x, y: fe.y + fb.y }
+        };
+    }
+
+    update(dt) {
+        this.currentForces = [];
+        this.particles.forEach((particle, i) => {
+            const forces = this.calculateForces(particle);
+            this.currentForces[i] = forces;
+
+            particle.vx += (forces.fe.x / particle.mass) * dt;
+            particle.vy += (forces.fe.y / particle.mass) * dt;
+
+            const Bz = this.fields.magnetic.direction === 'out' ? 
+                this.fields.magnetic.magnitude : 
+                -this.fields.magnetic.magnitude;
+            if (Bz !== 0) {
+                const theta = (particle.charge * Bz * dt) / particle.mass;
+                const cosTheta = Math.cos(theta);
+                const sinTheta = Math.sin(theta);
+                [particle.vx, particle.vy] = [
+                    particle.vx * cosTheta - particle.vy * sinTheta,
+                    particle.vx * sinTheta + particle.vy * cosTheta
+                ];
+            }
+
+            particle.x += particle.vx * dt;
+            particle.y += particle.vy * dt;
+            particle.trail.push({x: particle.x, y: particle.y});
+            if (particle.trail.length > this.settings.trailLength) {
+                particle.trail.shift();
+            }
+        });
+
+        this.updateDataPanel();
+    }
+
+    updateDataPanel() {
+        let dataHTML = '';
+        this.particles.forEach((p, i) => {
+            dataHTML += `
+                <div class="p-2 rounded bg-white shadow-sm">
+                    <div class="font-medium text-neutral">粒子 ${i+1}</div>
+                    <div class="grid grid-cols-2 gap-1 text-xs text-gray-600">
+                        <div>质量: ${p.mass} kg</div>
+                        <div>电荷: ${p.charge > 0 ? '+' : ''}${p.charge} C</div>
+                        <div>位置: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})</div>
+                        <div>速度: ${Math.hypot(p.vx, p.vy).toFixed(2)} m/s</div>
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('particles-data').innerHTML = dataHTML;
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.save();
+
+        // 绘制背景图片
+        if (this.bgImage) {
+            this.ctx.translate(this.bgX, this.bgY);
+            this.ctx.scale(this.bgScale, this.bgScale);
+            this.ctx.drawImage(this.bgImage, 0, 0);
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0); // 重置变换
+        }
+
+        // 粒子系统变换
+        if (this.particles.length > 0) {
+            const centerX = this.particles[0].x;
+            const centerY = this.particles[0].y;
+            this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
+            this.ctx.scale(this.zoomFactor, this.zoomFactor);
+            this.ctx.translate(-centerX, -centerY);
+        }
+
+        this.drawGrid();
+        this.drawFields();
+
+        this.particles.forEach((particle, i) => {
+            this.drawTrail(particle);
+            this.drawParticle(particle);
+            this.drawForceArrows(particle, this.currentForces[i]);
+        });
+
+        this.ctx.restore();
+    }
+
+    drawGrid() {
+        this.ctx.strokeStyle = '#ddd';
+        this.ctx.lineWidth = 0.5 / this.zoomFactor;
+        const gridSize = 50;
+        
+        const visibleLeft = this.particles[0]?.x - this.canvas.width/(2*this.zoomFactor) || 0;
+        const visibleRight = this.particles[0]?.x + this.canvas.width/(2*this.zoomFactor) || this.canvas.width;
+        const visibleTop = this.particles[0]?.y - this.canvas.height/(2*this.zoomFactor) || 0;
+        const visibleBottom = this.particles[0]?.y + this.canvas.height/(2*this.zoomFactor) || this.canvas.height;
+
+        for (let x = Math.floor(visibleLeft/gridSize)*gridSize; x <= visibleRight; x += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, visibleTop);
+            this.ctx.lineTo(x, visibleBottom);
+            this.ctx.stroke();
+        }
+
+        for (let y = Math.floor(visibleTop/gridSize)*gridSize; y <= visibleBottom; y += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(visibleLeft, y);
+            this.ctx.lineTo(visibleRight, y);
+            this.ctx.stroke();
+        }
+    }
+
+    drawFields() {
+        if (this.fields.electric.magnitude > 0) {
+            this.ctx.fillStyle = '#ff0000';
+            const spacing = 100;
+            const arrowSize = Math.min(this.fields.electric.magnitude * 0.5, 30);
+            const angle = this.fields.electric.angle;
+            
+            for (let x = 50; x < this.canvas.width; x += spacing) {
+                for (let y = 50; y < this.canvas.height; y += spacing) {
+                    const dx = Math.cos(angle) * arrowSize;
+                    const dy = -Math.sin(angle) * arrowSize;
+                    this.drawArrow(x, y, dx, dy);
+                }
+            }
+        }
+
+        if (this.fields.magnetic.magnitude > 0) {
+            this.ctx.fillStyle = '#0000ff';
+            const spacing = 100 - Math.min(this.fields.magnetic.magnitude * 15, 95);
+            
+            for (let x = 30; x < this.canvas.width; x += spacing) {
+                for (let y = 30; y < this.canvas.height; y += spacing) {
+                    if (this.fields.magnetic.direction === 'out') {
+                        this.drawCircleSymbol(x, y, 4);
+                    } else {
+                        this.drawCrossSymbol(x, y, 6);
+                    }
+                }
+            }
+        }
+    }
+
+    drawTrail(particle) {
+        this.ctx.strokeStyle = '#00ff00';
+        this.ctx.lineWidth = 2 / this.zoomFactor;
+        this.ctx.beginPath();
+        particle.trail.forEach((pos, i) => {
+            if (i === 0) this.ctx.moveTo(pos.x, pos.y);
+            else this.ctx.lineTo(pos.x, pos.y);
+        });
+        this.ctx.stroke();
+    }
+
+    drawParticle(particle) {
+        const radius = 5 / this.zoomFactor;
+        this.ctx.fillStyle = particle.charge > 0 ? '#ff0000' : '#0000ff';
+        this.ctx.beginPath();
+        this.ctx.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        if (this.showVelocity) {
+            const speed = Math.hypot(particle.vx, particle.vy);
+            if (speed > 0) {
+                const scale = 20 / this.zoomFactor;
+                const dx = (particle.vx / speed) * scale;
+                const dy = (particle.vy / speed) * scale;
+                
+                this.ctx.save();
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.lineWidth = 2 / this.zoomFactor;
+                this.drawArrow(particle.x, particle.y, dx, dy);
+                this.ctx.restore();
+            }
+        }
+    }
+
+    drawForceArrows(particle, forces) {
+        if (!forces) return;
+        const colors = { 
+            fe: '#FF0000', 
+            fb: '#0000FF', 
+            total: '#00FF00' 
+        };
+
+        const shouldDraw = {
+            fe: this.showElectricForce,
+            fb: this.showMagneticForce,
+            total: this.showTotalForce
+        };
+
+        const forceScale = parseFloat(document.getElementById('forceScale').value);
+
+        Object.entries(forces).forEach(([key, force]) => {
+            if (!shouldDraw[key]) return;
+            if (key === 'total' && (Math.abs(force.x) + Math.abs(force.y)) < 1e-30) return;
+
+            const magnitudeSq = force.x ** 2 + force.y ** 2;
+            if (magnitudeSq < 1e-100) return;
+
+            const scale = forceScale / this.zoomFactor;
+            const dx = force.x * scale;
+            const dy = force.y * scale;
+
+            this.drawArrow(
+                particle.x, 
+                particle.y, 
+                dx,
+                dy,
+                colors[key]
+            );
+        });
+    }
+
+    drawArrow(x, y, dx, dy, color = '#000000') {
+        const headLength = 15 / this.zoomFactor;
+        const angle = Math.atan2(dy, dx);
+       
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.fillStyle = color;
+        this.ctx.lineWidth = 3 / this.zoomFactor;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x + dx, y + dy);
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + dx, y + dy);
+        this.ctx.lineTo(
+            x + dx - headLength * Math.cos(angle - Math.PI/6),
+            y + dy - headLength * Math.sin(angle - Math.PI/6)
+        );
+        this.ctx.lineTo(
+            x + dx - headLength * Math.cos(angle + Math.PI/6),
+            y + dy - headLength * Math.sin(angle + Math.PI/6)
+        );
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+
+    drawCircleSymbol(x, y, radius) {
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawCrossSymbol(x, y, size) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.rotate(Math.PI/4);
+        this.ctx.fillRect(-size, -size/4, size*2, size/2);
+        this.ctx.rotate(Math.PI/2);
+        this.ctx.fillRect(-size, -size/4, size*2, size/2);
+        this.ctx.restore();
+    }
+
+    animate(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        const deltaTime = (timestamp - this.lastTime) * 0.001;
+        
+        if (!this.isPaused) {
+            this.update(deltaTime * this.settings.timeScale);
+            this.draw();
+        }
+
+        this.lastTime = timestamp;
+        this.animationId = requestAnimationFrame((t) => this.animate(t));
+    }
+
+    // 背景图片控制方法
+    initBackgroundControls() {
+        const input = document.getElementById('bgImageInput');
+        const preview = document.getElementById('bgPreview');
+        
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const img = new Image();
+                img.onload = () => {
+                    this.bgImage = img;
+                    this.bgScale = 1;
+                    this.bgX = (this.canvas.width - img.width) / 2;
+                    this.bgY = (this.canvas.height - img.height) / 2;
+                    preview.innerHTML = `<img src="${URL.createObjectURL(file)}" class="w-full h-full object-cover">`;
+                };
+                img.src = URL.createObjectURL(file);
+            }
+        });
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (this.bgImage && e.button === 0) {
+                this.isDragging = true;
+                this.dragStart.x = e.clientX - this.bgX;
+                this.dragStart.y = e.clientY - this.bgY;
+                this.canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            this.canvas.style.cursor = 'default';
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.isDragging && this.bgImage) {
+                this.bgX = e.clientX - this.dragStart.x;
+                this.bgY = e.clientY - this.dragStart.y;
+                this.draw();
+            }
+        });
+
+        this.canvas.addEventListener('wheel', (e) => {
+            if (this.bgImage) {
+                e.preventDefault();
+                const oldScale = this.bgScale;
+                this.bgScale = Math.max(0.1, Math.min(5, this.bgScale * (1 + e.deltaY * -0.01)));
+                
+                // 保持鼠标位置在图片上的相对位置
+                this.bgX = (e.clientX - this.canvas.offsetLeft) * (1 - this.bgScale / oldScale) + this.bgX * this.bgScale / oldScale;
+                this.bgY = (e.clientY - this.canvas.offsetTop) * (1 - this.bgScale / oldScale) + this.bgY * this.bgScale / oldScale;
+                
+                this.draw();
+            }
+        });
+    }
+}
+
+const simulator = new ParticleSimulator();
+simulator.animate(performance.now());
+</script>
+</body>
+</html>

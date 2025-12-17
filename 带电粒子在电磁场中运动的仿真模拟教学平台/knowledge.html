@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>带电粒子运动 基础知识梳理</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --secondary-color: #0d47a1;
+            --background: #ffffff;
+            --text-color: #2c3e50;
+            --card-bg: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', '微软雅黑', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+            color: var(--text-color);
+            transition: background 0.3s;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .progress-bar {
+            margin: 10px auto;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .card-container {
+            perspective: 1500px;
+            width: 100%;
+            margin: 20px auto;
+            flex-grow: 1;
+        }
+
+        .card {
+            position: relative;
+            width: 100%;
+            min-height: 700px;
+            max-width: 1200px;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+            cursor: pointer;
+            border-radius: 20px;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+            background: var(--card-bg);
+            margin: 0 auto;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .front {
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        }
+
+        .back {
+            transform: rotateY(180deg);
+            background: var(--card-bg);
+        }
+
+        .card-title {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+            text-align: center;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 0 10px;
+        }
+
+        .card-summary, .card-content {
+            display: none; /* 隐藏文字说明 */
+        }
+
+        .image-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .image-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px;
+            background: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            margin: 0;
+        }
+
+        .image-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 500px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #f8fafc;
+        }
+
+        .image-item p {
+            font-size: 1rem;
+            color: #4a5568;
+            text-align: center;
+            margin: 0;
+            padding: 5px;
+            line-height: 1.4;
+        }
+
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .categories button {
+            padding: 15px;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .categories button:hover {
+            background: var(--secondary-color);
+            transform: scale(1.02);
+        }
+
+        progress {
+            width: 100%;
+            height: 18px;
+            border-radius: 9px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        progress::-webkit-progress-bar {
+            background-color: #f1f5f9;
+        }
+
+        progress::-webkit-progress-value {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            transition: width 0.5s ease;
+        }
+
+        .controls {
+            position: fixed;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .controls button {
+            padding: 10px 15px;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls button:hover {
+            background: var(--secondary-color);
+            transform: translateX(-3px);
+        }
+
+        .debug-panel {
+            position: fixed;
+            top: 20px;
+            right: 150px;
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow: auto;
+            z-index: 1000;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .debug-panel h3 {
+            margin: 0 0 10px 0;
+            color: #4fd1c5;
+        }
+
+        #debugContent {
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .card {
+                min-height: 500px;
+                max-width: 95%;
+            }
+
+            .categories {
+                grid-template-columns: 1fr;
+            }
+
+            .card-title {
+                font-size: 1.6rem;
+            }
+
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .image-item img {
+                height: 250px;
+            }
+
+            .controls {
+                right: 5px;
+            }
+
+            .controls button {
+                padding: 8px 10px;
+                font-size: 0.9rem;
+                min-width: 80px;
+            }
+
+            .debug-panel {
+                right: 100px;
+                max-width: 250px;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>带电粒子运动 基础知识梳理</h1>
+            <div class="progress-bar">
+                <progress value="0" max="100"></progress>
+            </div>
+        </header>
+
+        <nav class="categories">
+            <button data-category="电荷与电场">电荷与电场</button>
+            <button data-category="磁场">磁场</button>
+            <button data-category="带电粒子在磁场中运动">磁场粒子运动</button>
+            <button data-category="带电粒子在电磁场中运动">电磁复合场</button>
+        </nav>
+
+        <main>
+            <div class="card-container">
+                <div class="card">
+                    <div class="card-face front">
+                        <h2 class="card-title"></h2>
+                    </div>
+                    <div class="card-face back">
+                        <div class="image-grid" id="card-images"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="controls">
+        <button id="prevBtn">上一页</button>
+        <button id="flipBtn">翻转卡片</button>
+        <button id="nextBtn">下一页</button>
+        <button id="menuBtn">返回菜单</button>
+        <button id="debugBtn">调试模式</button>
+    </div>
+
+    <div class="debug-panel" id="debugPanel">
+        <h3>系统日志</h3>
+        <div id="debugContent"></div>
+    </div>
+
+    <script>
+        class PhysicsLearningSystem {
+            constructor() {
+                this.categoryConfig = {
+                    '电荷与电场': 10,
+                    '磁场': 16,
+                    '带电粒子在磁场中运动': 18,
+                    '带电粒子在电磁场中运动': 16
+                };
+
+                this.currentCategory = null;
+                this.currentCardIndex = 0;
+                this.cards = [];
+                this.debugMode = false;
+                this.progress = JSON.parse(localStorage.getItem('progress')) || {};
+
+                this.initEventListeners();
+                this.initSystem();
+            }
+
+            initSystem() {
+                this.setResponsiveFontSize();
+                window.addEventListener('resize', () => this.setResponsiveFontSize());
+            }
+
+            initEventListeners() {
+                document.querySelectorAll('.categories button').forEach(btn => {
+                    btn.addEventListener('click', () => this.loadCategory(btn.dataset.category));
+                });
+
+                document.getElementById('flipBtn').addEventListener('click', () => 
+                    document.querySelector('.card').classList.toggle('flipped'));
+
+                document.querySelector('.card').addEventListener('click', (e) => {
+                    if (!e.target.closest('.image-item')) {
+                        document.querySelector('.card').classList.toggle('flipped');
+                    }
+                });
+
+                document.getElementById('prevBtn').addEventListener('click', () => this.prevCard());
+                document.getElementById('nextBtn').addEventListener('click', () => this.nextCard());
+                document.getElementById('menuBtn').addEventListener('click', () => this.showMenu());
+                document.getElementById('debugBtn').addEventListener('click', () => this.toggleDebug());
+            }
+
+            async loadCategory(category) {
+                try {
+                    this.currentCategory = category;
+                    this.currentCardIndex = 0;
+                    this.cards = await this.generateCards(category);
+                    this.showCard(0);
+                    this.log(`成功加载分类：${category}，共 ${this.cards.length} 张卡片`);
+                } catch (error) {
+                    this.logError(`加载失败：${error.message}`);
+                }
+            }
+
+            async generateCards(category) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const count = this.categoryConfig[category];
+                        const cards = [];
+
+                        // 生成总览卡片
+                        cards.push({
+                            title: `${category} 知识总览`,
+                            images: Array.from({length: count}, (_, i) => ({
+                                name: `${category} 第${i+1}页`,
+                                path: `${category}${i+1}.png`
+                            }))
+                        });
+
+                        // 生成详细卡片
+                        for (let i = 1; i <= count; i++) {
+                            cards.push({
+                                title: `${category} 第${i}页`,
+                                images: [{
+                                    name: `${category} 知识卡片${i}`,
+                                    path: `${category}${i}.png`
+                                }]
+                            });
+                        }
+                        resolve(cards);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            showCard(index) {
+                if (index < 0 || index >= this.cards.length) return;
+
+                this.currentCardIndex = index;
+                const card = this.cards[index];
+                const cardElement = document.querySelector('.card');
+
+                if (cardElement.classList.contains('flipped')) {
+                    cardElement.classList.remove('flipped');
+                }
+
+                document.querySelector('.card-title').textContent = card.title;
+
+                const imageGrid = document.getElementById('card-images');
+                imageGrid.innerHTML = '';
+
+                card.images.forEach(img => {
+                    const container = document.createElement('div');
+                    container.className = 'image-item';
+                    
+                    const imgElem = new Image();
+                    imgElem.src = img.path;
+                    imgElem.alt = img.name;
+                    imgElem.loading = 'lazy';
+                    
+                    imgElem.onerror = () => {
+                        imgElem.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+                        imgElem.style.backgroundColor = '#f0f0f0';
+                        this.logError(`图片加载失败：${img.path}`);
+                    };
+
+                    const nameElem = document.createElement('p');
+                    nameElem.textContent = img.name;
+
+                    container.appendChild(imgElem);
+                    container.appendChild(nameElem);
+                    imageGrid.appendChild(container);
+                });
+
+                document.getElementById('prevBtn').disabled = index === 0;
+                document.getElementById('nextBtn').disabled = index === this.cards.length - 1;
+                this.updateProgress();
+            }
+
+            setResponsiveFontSize() {
+                const card = document.querySelector('.card');
+                if (!card) return;
+
+                const cardWidth = card.offsetWidth;
+                const baseSize = Math.min(cardWidth / 35, 28);
+                
+                document.querySelector('.card-title').style.fontSize = `${baseSize * 1.4}px`;
+            }
+
+            updateProgress() {
+                const progress = (this.currentCardIndex + 1) / this.cards.length * 100;
+                document.querySelector('progress').value = progress;
+                this.progress[this.currentCategory] = {
+                    progress: progress,
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('progress', JSON.stringify(this.progress));
+            }
+
+            prevCard() { this.showCard(this.currentCardIndex - 1); }
+            nextCard() { this.showCard(this.currentCardIndex + 1); }
+
+            showMenu() {
+                this.currentCardIndex = 0;
+                this.cards = [];
+                document.querySelector('.card-title').textContent = '';
+                document.getElementById('card-images').innerHTML = '';
+                document.querySelector('progress').value = 0;
+                this.log('已返回主菜单');
+            }
+
+            toggleDebug() {
+                this.debugMode = !this.debugMode;
+                document.getElementById('debugPanel').style.display = 
+                    this.debugMode ? 'block' : 'none';
+                this.log(`调试模式 ${this.debugMode ? '开启' : '关闭'}`);
+            }
+
+            log(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.textContent = `[${timestamp}] ${message}`;
+                entry.style.color = '#a0aec0';
+                this.appendDebug(entry);
+            }
+
+            logError(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.textContent = `[${timestamp}] ❗ ${message}`;
+                entry.style.color = '#fc8181';
+                this.appendDebug(entry);
+            }
+
+            appendDebug(element) {
+                const debugContent = document.getElementById('debugContent');
+                debugContent.appendChild(element);
+                debugContent.scrollTop = debugContent.scrollHeight;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const system = new PhysicsLearningSystem();
+            window.system = system;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>摆线轨迹演示（图层优化版）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+            font-family: 'Segoe UI', sans-serif;
+            position: relative;
+        }
+        .controls {
+            padding: 15px;
+            background: #ffffff;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        label {
+            min-width: 120px;
+            font-size: 14px;
+            color: #333;
+        }
+        input[type="number"] {
+            width: 100px;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #canvas {
+            flex: 1;
+            background: #fff;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            cursor: move;
+        }
+        .vector-controls {
+            display: flex;
+            gap: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .rotatable {
+            cursor: alias;
+        }
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            display: none;
+        }
+        .text-box {
+            position: absolute;
+            min-width: 100px;
+            min-height: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #007bff;
+            border-radius: 4px;
+            padding: 25px 8px 8px;
+            cursor: move;
+            resize: none;
+            overflow: hidden;
+            z-index: 2;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .delete-btn {
+            position: absolute;
+            right: 2px;
+            top: 2px;
+            background: #dc3545;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            right: 0;
+            bottom: 0;
+            background: #007bff;
+            cursor: se-resize;
+            border-radius: 2px 0 4px 0;
+        }
+        .draw-mode-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .draw-mode-btn {
+            padding: 6px 12px;
+            background: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .draw-mode-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .color-btn.active {
+            border-color: #007bff;
+            box-shadow: 0 0 4px rgba(0, 123, 255, 0.5);
+        }
+        .velocity-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            border: 2px solid #e63946;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <!-- 颜色选择和粗细调节 -->
+        <div class="control-group">
+            <label>画笔颜色:</label>
+            <div class="color-buttons">
+                <button class="color-btn" data-color="#ffffff" style="background-color: #ffffff;">白</button>
+                <button class="color-btn active" data-color="#000000" style="background-color: #000; color: white;">黑</button>
+                <button class="color-btn" data-color="#ff0000" style="background-color: #ff0000; color: white;">红</button>
+                <button class="color-btn" data-color="#0000ff" style="background-color: #0000ff; color: white;">蓝</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>画笔粗细:</label>
+            <input type="number" id="brushThickness" value="4" min="1" max="100" step="1">
+        </div>
+
+        <!-- 原有控制项 -->
+        <div class="control-group">
+            <label>背景图片:</label>
+            <input type="file" id="bgImageUpload" accept="image/*">
+        </div>
+        <div class="control-group">
+            <label>圆半径 R (px):</label>
+            <input type="number" id="R" value="60" min="10" step="1">
+        </div>
+        <div class="control-group">
+            <label>圆心速度 V心 (px/s):</label>
+            <input type="number" id="v1Mag" value="80" min="0" step="1">
+        </div>
+        <div class="control-group">
+            <label>V心 方向 (度):</label>
+            <input type="number" id="v1Angle" value="0" step="1">
+        </div>
+        <div class="control-group">
+            <label>自转线速度 V线 (px/s):</label>
+            <input type="number" id="v2Mag" value="60" min="0" step="1">
+        </div>
+        <div class="control-group">
+            <label>自转方向:</label>
+            <select id="rotationDirection" style="width: 100px;">
+                <option value="ccw">逆时针</option>
+                <option value="cw">顺时针</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>θ角度 (度):</label>
+            <input type="number" id="theta" value="0" step="1">
+        </div>
+        <div class="control-group">
+            <label>速度单位:</label>
+            <select id="velocityDisplayUnit" style="width: 100px;">
+                <option value="px">px/s</option>
+                <option value="m">m/s</option>
+            </select>
+        </div>
+        
+        <div class="vector-controls">
+            <div class="control-group">
+                <label><input type="checkbox" id="showV1" checked> V心（黑）</label>
+                <label><input type="checkbox" id="showV2" checked> V线（绿）</label>
+                <label><input type="checkbox" id="showV" checked> V和（红）</label>
+                <label><input type="checkbox" id="showCenter"> 圆心</label>
+                <label><input type="checkbox" id="showHelper"> 辅助圆/线</label>
+            </div>
+        </div>
+
+        <button id="rotateModeBtn">旋转模式关</button>
+        <button id="brushModeBtn">画笔模式关</button>
+        <div class="draw-mode-selector">
+            <button class="draw-mode-btn active" data-mode="free">自由绘制</button>
+            <button class="draw-mode-btn" data-mode="line">线段绘制</button>
+        </div>
+        <button id="undoBtn">撤销</button>
+        <button id="pauseBtn">运动</button>
+        <button id="resetBtn">重置</button>
+        <button id="clearTrailBtn">清空轨迹</button>
+        <button id="stampBtn">拓印</button>
+        <button id="stampRedTrailBtn">拓印红色轨迹</button>
+        <button id="addTextBtn">添加文本框</button>
+        
+        <!-- 调试信息和速度显示 -->
+        <div class="control-group">
+            <button id="debugBtn">调试信息</button>
+            <div class="velocity-display" id="velocityDisplay">
+                V合大小：<span id="vMagnitude">0.00</span> <span id="unit">px/s</span>
+            </div>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="debug-info" id="debugInfo"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let debugMode = false;
+        
+        // 笔迹相关变量（屏幕坐标）
+        let currentBrushColor = '#000000';
+        let currentBrushThickness = 4;
+        let drawings = []; // 存储屏幕坐标的绘制内容
+        let currentPath = null;
+        let currentLine = null;
+        let selectedDrawingIndex = -1;
+        let isBrushMode = false;
+        let isDrawing = false;
+        let drawMode = 'free';
+
+        // 控制变量（世界坐标）
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let lastMouseX, lastMouseY;
+        let isRotating = false;
+        let initialAngle = 0;
+        let fixedPointX = 0;
+        let fixedPointY = 0;
+        
+        // 动画变量
+        let isAnimating = false;
+        let lastTime = 0;
+        let currentCenterX = 0;
+        let currentCenterY = 0;
+        let currentTheta = 0;
+        let trail = [];
+        
+        // 背景图片
+        let bgImage = {
+            img: null,
+            x: canvas.width/2,
+            y: canvas.height/2,
+            width: 0,
+            height: 0,
+            isDragging: false,
+            isResizing: false,
+            resizeEdge: null,
+            startX: 0,
+            startY: 0,
+            original: {}
+        };
+
+        const config = {
+            MAX_TRAIL_POINTS: 20000,
+            SAMPLING_DISTANCE: 0.05,
+            TRAIL_GROUP_SIZE: 1000,
+            AUTO_CLEAR_RATIO: 0.2,
+            ARROW_SCALE: 1,
+            ARROW_HEAD_SIZE: 15,
+            BG_RESIZE_HANDLE_SIZE: 8
+        };
+
+        // 初始化画布
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.98;
+            canvas.height = window.innerHeight * 0.85;
+            bgImage.x = canvas.width/2;
+            bgImage.y = canvas.height/2;
+            draw();
+        }
+
+        // 颜色选择事件
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentBrushColor = btn.dataset.color;
+            });
+        });
+
+        // 画笔粗细调节
+        document.getElementById('brushThickness').addEventListener('change', (e) => {
+            currentBrushThickness = parseFloat(e.target.value);
+        });
+
+        function drawBackground() {
+            if (!bgImage.img) return;
+            
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            const x = bgImage.x - bgImage.width/2;
+            const y = bgImage.y - bgImage.height/2;
+            
+            ctx.drawImage(bgImage.img, x, y, bgImage.width, bgImage.height);
+            
+            ctx.strokeStyle = '#007bff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                x + bgImage.width - config.BG_RESIZE_HANDLE_SIZE,
+                y + bgImage.height - config.BG_RESIZE_HANDLE_SIZE,
+                config.BG_RESIZE_HANDLE_SIZE,
+                config.BG_RESIZE_HANDLE_SIZE
+            );
+            ctx.restore();
+        }
+
+        function drawVector(ctx, startX, startY, dx, dy, color) {
+            const scaledDx = dx * config.ARROW_SCALE;
+            const scaledDy = -dy * config.ARROW_SCALE;
+            const angle = Math.atan2(scaledDy, scaledDx);
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2 / scale;
+            
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(startX + scaledDx, startY + scaledDy);
+            
+            ctx.translate(startX + scaledDx, startY + scaledDy);
+            ctx.rotate(angle);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-config.ARROW_HEAD_SIZE, config.ARROW_HEAD_SIZE/2);
+            ctx.lineTo(-config.ARROW_HEAD_SIZE, -config.ARROW_HEAD_SIZE/2);
+            ctx.closePath();
+            
+            ctx.fill();
+            ctx.restore();
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+
+            // 绘制已保存的笔迹和拓印（按时间顺序）
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            drawings.forEach((drawing, index) => {
+                if (drawing.type === 'free') {
+                    ctx.strokeStyle = drawing.color;
+                    ctx.lineWidth = drawing.thickness;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(drawing.points[0].x, drawing.points[0].y);
+                    drawing.points.forEach(p => ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+                } else if (drawing.type === 'line') {
+                    ctx.strokeStyle = index === selectedDrawingIndex ? '#ff6b6b' : drawing.color;
+                    ctx.lineWidth = drawing.thickness;
+                    ctx.beginPath();
+                    ctx.moveTo(drawing.start.x, drawing.start.y);
+                    ctx.lineTo(drawing.end.x, drawing.end.y);
+                    ctx.stroke();
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.beginPath();
+                    ctx.arc(drawing.start.x, drawing.start.y, 2, 0, Math.PI*2);
+                    ctx.arc(drawing.end.x, drawing.end.y, 2, 0, Math.PI*2);
+                    ctx.fill();
+                } else if (drawing.type === 'stamp') {
+                    // 绘制拓印
+                    const stamp = drawing;
+                    const widthRatio = canvas.width / stamp.canvasWidth;
+                    const heightRatio = canvas.height / stamp.canvasHeight;
+                    const ratio = Math.min(widthRatio, heightRatio);
+
+                    const screenCenterX = ((stamp.worldCenterX - stamp.offsetX) * stamp.scale + stamp.canvasWidth/2) * widthRatio;
+                    const screenCenterY = ((stamp.worldCenterY - stamp.offsetY) * stamp.scale + stamp.canvasHeight/2) * heightRatio;
+                    const screenR = stamp.R * stamp.scale * ratio;
+
+                    ctx.beginPath();
+                    ctx.arc(screenCenterX, screenCenterY, screenR, 0, Math.PI * 2);
+                    ctx.strokeStyle = stamp.color;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                } else if (drawing.type === 'red-trail-stamp') {
+                    ctx.save();
+                    ctx.strokeStyle = drawing.color;
+                    ctx.lineWidth = drawing.lineWidth / drawing.scale; // 还原线宽
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    
+                    // 转换世界坐标到屏幕坐标
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    
+                    if (drawing.points.length > 0) {
+                        const firstPoint = drawing.points[0];
+                        ctx.moveTo(
+                            (firstPoint.x - drawing.offset.x) * drawing.scale + centerX,
+                            (firstPoint.y - drawing.offset.y) * drawing.scale + centerY
+                        );
+                        
+                        drawing.points.forEach(point => {
+                            ctx.lineTo(
+                                (point.x - drawing.offset.x) * drawing.scale + centerX,
+                                (point.y - drawing.offset.y) * drawing.scale + centerY
+                            );
+                        });
+                    }
+                    
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            });
+            ctx.restore();
+
+            // 绘制实时笔迹（顶层）
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (isBrushMode && isDrawing) {
+                if (drawMode === 'free' && currentPath) {
+                    ctx.strokeStyle = currentPath.color;
+                    ctx.lineWidth = currentPath.thickness;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(currentPath.points[0].x, currentPath.points[0].y);
+                    currentPath.points.forEach(p => ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+                } else if (drawMode === 'line' && currentLine) {
+                    ctx.strokeStyle = currentLine.color;
+                    ctx.lineWidth = currentLine.thickness;
+                    ctx.beginPath();
+                    ctx.moveTo(currentLine.start.x, currentLine.start.y);
+                    ctx.lineTo(currentLine.end.x, currentLine.end.y);
+                    ctx.stroke();
+                    if (!selectedDrawingIndex >= 0) {
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.beginPath();
+                        ctx.arc(currentLine.start.x, currentLine.start.y, 2, 0, Math.PI*2);
+                        ctx.arc(currentLine.end.x, currentLine.end.y, 2, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+            ctx.restore();
+
+            // 绘制变换内容（世界坐标，最上层）
+            ctx.save();
+            ctx.translate(canvas.width/2, canvas.height/2);
+            ctx.scale(scale, scale);
+            ctx.translate(-offsetX, -offsetY);
+
+            // 速度计算
+            const theta = parseFloat(document.getElementById('theta').value);
+            const direction = document.getElementById('rotationDirection').value;
+            const alphaDeg = direction === 'cw' ? theta + 90 : theta - 90;
+            const alpha = alphaDeg * Math.PI / 180;
+            const R = parseFloat(document.getElementById('R').value);
+            const v1Mag = parseFloat(document.getElementById('v1Mag').value);
+            const v1AngleRad = parseFloat(document.getElementById('v1Angle').value) * Math.PI / 180;
+            const v2Mag = parseFloat(document.getElementById('v2Mag').value);
+            const dir = direction === 'cw' ? -1 : 1;
+
+            const v1x = v1Mag * Math.cos(v1AngleRad);
+            const v1y = v1Mag * Math.sin(v1AngleRad);
+            const v2Angle = alpha + currentTheta + dir * Math.PI/2;
+            const v2x = v2Mag * Math.cos(v2Angle);
+            const v2y = v2Mag * Math.sin(v2Angle);
+            
+            const vx = v1x + v2x;
+            const vy = v1y + v2y;
+            const vMagnitude = Math.sqrt(vx*vx + vy*vy);
+
+            // 更新速度显示
+            const unit = document.getElementById('velocityDisplayUnit').value;
+            let displayValue = vMagnitude;
+            let unitText = 'px/s';
+            if (unit === 'm') {
+                displayValue = vMagnitude * 0.01;
+                unitText = 'm/s';
+            }
+            document.getElementById('vMagnitude').textContent = displayValue.toFixed(2);
+            document.getElementById('unit').textContent = unitText;
+
+            // 绘制轨迹
+            ctx.beginPath();
+            ctx.strokeStyle = '#e63946';
+            ctx.lineWidth = 2 / scale;
+            for (let i = 0; i < trail.length; i += config.TRAIL_GROUP_SIZE) {
+                const group = trail.slice(i, i + config.TRAIL_GROUP_SIZE);
+                group.forEach((point, j) => {
+                    j === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+                ctx.beginPath();
+            }
+
+            // 绘制圆
+            ctx.beginPath();
+            ctx.arc(currentCenterX, currentCenterY, R, 0, Math.PI * 2);
+            ctx.strokeStyle = '#1d3557';
+            ctx.lineWidth = 1.5 / scale;
+            ctx.stroke();
+
+            // 绘制圆心
+            if (document.getElementById('showCenter').checked) {
+                ctx.beginPath();
+                ctx.arc(currentCenterX, currentCenterY, 6/scale, 0, Math.PI*2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            }
+
+            // 绘制绿点
+            const point = {
+                x: currentCenterX + R * Math.cos(alpha + currentTheta),
+                y: currentCenterY - R * Math.sin(alpha + currentTheta)
+            };
+            
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 6/scale, 0, Math.PI * 2);
+            ctx.fillStyle = '#2a9d8f';
+            ctx.fill();
+
+            // 辅助线
+            if (document.getElementById('showHelper').checked) {
+                const v1TipX = point.x + v1x * config.ARROW_SCALE;
+                const v1TipY = point.y - v1y * config.ARROW_SCALE;
+                const vTipX = point.x + (vx) * config.ARROW_SCALE;
+                const vTipY = point.y - (vy) * config.ARROW_SCALE;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 3]);
+                ctx.strokeStyle = "#6c757d";
+                ctx.lineWidth = 1 / scale;
+                ctx.moveTo(v1TipX, v1TipY);
+                ctx.lineTo(vTipX, vTipY);
+                ctx.stroke();
+                ctx.restore();
+
+                if (v2Mag > 0) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.setLineDash([5, 3]);
+                    ctx.strokeStyle = "#adb5bd";
+                    ctx.lineWidth = 1 / scale;
+                    ctx.arc(v1TipX, v1TipY, v2Mag, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // 速度矢量
+            const showV1 = document.getElementById('showV1').checked;
+            const showV2 = document.getElementById('showV2').checked;
+            const showV = document.getElementById('showV').checked;
+
+            if (showV1) drawVector(ctx, point.x, point.y, v1x, v1y, '#1d3557');
+            if (showV2) drawVector(ctx, point.x, point.y, v2x, v2y, '#2a9d8f');
+            if (showV) drawVector(ctx, point.x, point.y, vx, vy, '#e63946');
+
+            ctx.restore();
+
+            // 调试信息
+            if(debugMode) {
+                const info = `圆心坐标: X=${currentCenterX.toFixed(1)}, Y=${currentCenterY.toFixed(1)}
+                            视图缩放: ${scale.toFixed(2)}x
+                            视图偏移: X=${offsetX.toFixed(1)}, Y=${offsetY.toFixed(1)}`;
+                document.getElementById('debugInfo').textContent = info;
+            }
+        }
+
+        function update(dt) {
+            if (!isRotating) {
+                const v1Mag = parseFloat(document.getElementById('v1Mag').value);
+                const v1Angle = parseFloat(document.getElementById('v1Angle').value) * Math.PI / 180;
+                
+                currentCenterX += v1Mag * Math.cos(v1Angle) * dt;
+                currentCenterY -= v1Mag * Math.sin(v1Angle) * dt;
+
+                const R = parseFloat(document.getElementById('R').value);
+                const v2Mag = parseFloat(document.getElementById('v2Mag').value);
+                const dir = document.getElementById('rotationDirection').value === 'cw' ? -1 : 1;
+                currentTheta += (v2Mag / R) * dir * dt;
+                currentTheta = ((currentTheta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+
+                const theta = parseFloat(document.getElementById('theta').value);
+                const alphaDeg = dir === -1 ? theta + 90 : theta - 90;
+                const alpha = alphaDeg * Math.PI / 180;
+                
+                const point = {
+                    x: currentCenterX + R * Math.cos(alpha + currentTheta),
+                    y: currentCenterY - R * Math.sin(alpha + currentTheta)
+                };
+                trail.push({ x: point.x, y: point.y });
+            }
+
+            if (trail.length > config.MAX_TRAIL_POINTS) {
+                const keepCount = config.MAX_TRAIL_POINTS * (1 - config.AUTO_CLEAR_RATIO);
+                trail = trail.slice(-keepCount);
+            }
+        }
+
+        function animate(timestamp) {
+            if (!isAnimating) return;
+
+            const dt = (timestamp - (lastTime || timestamp)) / 1000;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // 事件处理
+        canvas.addEventListener('wheel', handleWheel);
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseUp);
+        document.getElementById('bgImageUpload').addEventListener('change', handleImageUpload);
+
+        // 半径调整逻辑
+        document.getElementById('R').addEventListener('change', function() {
+            if (!isAnimating) {
+                const oldR = parseFloat(this.dataset.oldValue || this.value);
+                const newR = parseFloat(this.value);
+                
+                // 计算当前绿点坐标（保持不变）
+                const thetaDeg = parseFloat(document.getElementById('theta').value);
+                const direction = document.getElementById('rotationDirection').value;
+                const alphaDeg = direction === 'cw' ? thetaDeg + 90 : thetaDeg - 90;
+                const alpha = alphaDeg * Math.PI / 180;
+                const totalAngle = alpha + currentTheta;
+                
+                // 旧坐标计算绿点位置
+                const oldGreenX = currentCenterX + oldR * Math.cos(totalAngle);
+                const oldGreenY = currentCenterY - oldR * Math.sin(totalAngle); // 注意Y轴方向
+                
+                // 新圆心坐标计算（保持绿点位置不变）
+                currentCenterX = oldGreenX - newR * Math.cos(totalAngle);
+                currentCenterY = oldGreenY + newR * Math.sin(totalAngle); // 修正Y轴方向
+                
+                this.dataset.oldValue = newR;
+                draw();
+            }
+        });
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        bgImage.img = img;
+                        bgImage.width = img.width;
+                        bgImage.height = img.height;
+                        draw();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            if (bgImage.isDragging || bgImage.isResizing) return;
+
+            const zoomIntensity = 0.1;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const worldX = (mouseX - canvas.width/2)/scale + offsetX;
+            const worldY = (mouseY - canvas.height/2)/scale + offsetY;
+            
+            const delta = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
+            scale *= delta;
+            scale = Math.min(Math.max(0.1, scale), 10);
+            
+            const newWorldX = (mouseX - canvas.width/2)/scale + offsetX;
+            const newWorldY = (mouseY - canvas.height/2)/scale + offsetY;
+            offsetX += worldX - newWorldX;
+            offsetY += worldY - newWorldY;
+            
+            draw();
+        }
+
+        function handleMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (isBrushMode) {
+                if (drawMode === 'line') {
+                    for (let i = 0; i < drawings.length; i++) {
+                        const drawing = drawings[i];
+                        if (drawing.type !== 'line') continue;
+                        
+                        const startDist = Math.hypot(mouseX - drawing.start.x, mouseY - drawing.start.y);
+                        const endDist = Math.hypot(mouseX - drawing.end.x, mouseY - drawing.end.y);
+                        
+                        if (startDist < 4 || endDist < 4) {
+                            selectedDrawingIndex = i;
+                            selectedPoint = startDist < endDist ? 'start' : 'end';
+                            return;
+                        }
+                    }
+                }
+
+                if (drawMode === 'free') {
+                    currentPath = {
+                        points: [{x: mouseX, y: mouseY}],
+                        color: currentBrushColor,
+                        thickness: currentBrushThickness
+                    };
+                    isDrawing = true;
+                } else if (drawMode === 'line') {
+                    currentLine = {
+                        start: { x: mouseX, y: mouseY },
+                        end: { x: mouseX, y: mouseY },
+                        color: currentBrushColor,
+                        thickness: currentBrushThickness
+                    };
+                    isDrawing = true;
+                }
+                return;
+            }
+
+            // 旋转模式处理
+            if (isRotating) {
+                const R = parseFloat(document.getElementById('R').value);
+                const theta = parseFloat(document.getElementById('theta').value);
+                const direction = document.getElementById('rotationDirection').value;
+                const alphaDeg = direction === 'cw' ? theta + 90 : theta - 90;
+                const alpha = alphaDeg * Math.PI / 180;
+                
+                fixedPointX = currentCenterX + R * Math.cos(alpha + currentTheta);
+                fixedPointY = currentCenterY - R * Math.sin(alpha + currentTheta);
+
+                const worldMouseX = (mouseX - canvas.width/2)/scale + offsetX;
+                const worldMouseY = (mouseY - canvas.height/2)/scale + offsetY;
+                
+                initialAngle = Math.atan2(worldMouseY - fixedPointY, worldMouseX - fixedPointX);
+                isDragging = true;
+                return;
+            }
+
+            // 背景图片处理
+            if (bgImage.img) {
+                const imgLeft = bgImage.x - bgImage.width/2;
+                const imgRight = bgImage.x + bgImage.width/2;
+                const imgTop = bgImage.y - bgImage.height/2;
+                const imgBottom = bgImage.y + bgImage.height/2;
+
+                const handleX = imgRight - config.BG_RESIZE_HANDLE_SIZE;
+                const handleY = imgBottom - config.BG_RESIZE_HANDLE_SIZE;
+                if (mouseX >= handleX && mouseX <= imgRight &&
+                    mouseY >= handleY && mouseY <= imgBottom) {
+                    bgImage.isResizing = true;
+                    bgImage.startX = mouseX;
+                    bgImage.startY = mouseY;
+                    bgImage.original = {
+                        width: bgImage.width,
+                        height: bgImage.height,
+                        x: bgImage.x,
+                        y: bgImage.y
+                    };
+                    return;
+                }
+
+                if (mouseX >= imgLeft && mouseX <= imgRight &&
+                    mouseY >= imgTop && mouseY <= imgBottom) {
+                    bgImage.isDragging = true;
+                    bgImage.startX = mouseX;
+                    bgImage.startY = mouseY;
+                    bgImage.original.x = bgImage.x;
+                    bgImage.original.y = bgImage.y;
+                    return;
+                }
+            }
+
+            // 平移视图处理
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top; // 修正Y坐标计算
+
+            if (isBrushMode && isDrawing) {
+                if (drawMode === 'free' && currentPath) {
+                    currentPath.points.push({x: mouseX, y: mouseY});
+                } else if (drawMode === 'line' && currentLine) {
+                    if (selectedDrawingIndex >= 0) {
+                        const drawing = drawings[selectedDrawingIndex];
+                        drawing[selectedPoint].x = mouseX;
+                        drawing[selectedPoint].y = mouseY;
+                    } else {
+                        currentLine.end.x = mouseX;
+                        currentLine.end.y = mouseY;
+                    }
+                }
+                draw();
+                return;
+            }
+
+            if (isRotating && isDragging) {
+                const worldMouseX = (mouseX - canvas.width/2)/scale + offsetX;
+                const worldMouseY = (mouseY - canvas.height/2)/scale + offsetY;
+
+                const currentAngle = Math.atan2(worldMouseY - fixedPointY, worldMouseX - fixedPointX);
+                const deltaAngle = currentAngle - initialAngle;
+
+                const dx = currentCenterX - fixedPointX;
+                const dy = currentCenterY - fixedPointY;
+                const newDx = dx * Math.cos(deltaAngle) - dy * Math.sin(deltaAngle);
+                const newDy = dx * Math.sin(deltaAngle) + dy * Math.cos(deltaAngle);
+                currentCenterX = fixedPointX + newDx;
+                currentCenterY = fixedPointY + newDy;
+                currentTheta -= deltaAngle;
+
+                initialAngle = currentAngle;
+                draw();
+                return;
+            }
+
+            if (bgImage.isDragging) {
+                const dx = mouseX - bgImage.startX;
+                const dy = mouseY - bgImage.startY;
+                bgImage.x = bgImage.original.x + dx;
+                bgImage.y = bgImage.original.y + dy;
+                draw();
+                return;
+            }
+
+            if (bgImage.isResizing) {
+                const dx = mouseX - bgImage.startX;
+                const dy = mouseY - bgImage.startY;
+                bgImage.width = bgImage.original.width + dx;
+                bgImage.height = bgImage.original.height + dy;
+                draw();
+                return;
+            }
+
+            if (isDragging) {
+                const dx = (e.clientX - lastMouseX)/scale;
+                const dy = (e.clientY - lastMouseY)/scale;
+                offsetX -= dx;
+                offsetY -= dy;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                draw();
+            }
+        }
+
+        function handleMouseUp() {
+            bgImage.isDragging = false;
+            bgImage.isResizing = false;
+            isDragging = false;
+            selectedDrawingIndex = -1;
+
+            if (isBrushMode && isDrawing) {
+                if (drawMode === 'free' && currentPath) {
+                    drawings.push({ 
+                        type: 'free', 
+                        points: currentPath.points, 
+                        color: currentPath.color, 
+                        thickness: currentPath.thickness 
+                    });
+                    currentPath = null;
+                } else if (drawMode === 'line' && currentLine) {
+                    drawings.push({ 
+                        type: 'line', 
+                        start: currentLine.start, 
+                        end: currentLine.end, 
+                        color: currentLine.color, 
+                        thickness: currentLine.thickness 
+                    });
+                    currentLine = null;
+                }
+                isDrawing = false;
+                draw();
+            }
+        }
+
+        // 按钮事件
+        document.getElementById('rotateModeBtn').addEventListener('click', () => {
+            isRotating = !isRotating;
+            canvas.classList.toggle('rotatable', isRotating);
+            document.getElementById('rotateModeBtn').textContent = 
+                isRotating ? '旋转模式开' : '旋转模式关';
+        });
+
+        document.getElementById('brushModeBtn').addEventListener('click', () => {
+            isBrushMode = !isBrushMode;
+            canvas.style.cursor = isBrushMode ? 'crosshair' : 'move';
+            document.getElementById('brushModeBtn').textContent = 
+                isBrushMode ? '画笔模式开' : '画笔模式关';
+        });
+
+        document.querySelectorAll('.draw-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.draw-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                drawMode = btn.dataset.mode;
+                selectedDrawingIndex = -1;
+                draw();
+            });
+        });
+
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (drawings.length > 0) {
+                drawings.pop();
+            }
+            draw();
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isAnimating = !isAnimating;
+            document.getElementById('pauseBtn').textContent = isAnimating ? '暂停' : '运动';
+            if (isAnimating) {
+                lastTime = 0;
+                requestAnimationFrame(animate);
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', reset);
+
+        function reset() {
+            currentCenterX = 0;
+            currentCenterY = 0;
+            currentTheta = 0;
+            trail = [];
+            scale = 1;
+            offsetX = 0;
+            offsetY = 0;
+            drawings = [];
+            bgImage = {
+                img: null,
+                x: canvas.width/2,
+                y: canvas.height/2,
+                width: 0,
+                height: 0,
+                isDragging: false,
+                isResizing: false,
+                resizeEdge: null,
+                startX: 0,
+                startY: 0,
+                original: {}
+            };
+            draw();
+        }
+
+        document.getElementById('clearTrailBtn').addEventListener('click', () => {
+            trail = [];
+            draw();
+        });
+
+        document.getElementById('stampBtn').addEventListener('click', function() {
+            const R = parseFloat(document.getElementById('R').value);
+            const theta = parseFloat(document.getElementById('theta').value);
+            const rotationDirection = document.getElementById('rotationDirection').value;
+            const color = '#808080';
+
+            const stampData = {
+                type: 'stamp',
+                worldCenterX: currentCenterX,
+                worldCenterY: currentCenterY,
+                R: R,
+                theta: theta,
+                currentTheta: currentTheta,
+                rotationDirection: rotationDirection,
+                offsetX: offsetX,
+                offsetY: offsetY,
+                scale: scale,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                color: color
+            };
+            drawings.push(stampData);
+            draw();
+        });
+
+        // 新增红色轨迹拓印按钮事件处理
+        document.getElementById('stampRedTrailBtn').addEventListener('click', function() {
+            // 保存当前轨迹数据（世界坐标）
+            const trailData = {
+                type: 'red-trail-stamp',
+                points: [...trail], // 复制当前轨迹点
+                color: '#e63946', // 红色轨迹颜色
+                lineWidth: 2, // 原始线宽（对应绘制时的2/scale）
+                scale: scale, // 保存当前缩放比例
+                offset: {x: offsetX, y: offsetY} // 保存当前偏移量
+            };
+            
+            drawings.push(trailData);
+            draw();
+        });
+
+        document.getElementById('addTextBtn').addEventListener('click', () => {
+            const textBox = document.createElement('div');
+            textBox.className = 'text-box';
+            textBox.style.left = '50%';
+            textBox.style.top = '50%';
+            textBox.contentEditable = true;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.addEventListener('click', () => textBox.remove());
+            
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'resize-handle';
+
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+            
+            textBox.addEventListener('mousedown', (e) => {
+                if (e.target !== textBox && e.target !== deleteBtn) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialX = parseFloat(textBox.style.left) || 0;
+                initialY = parseFloat(textBox.style.top) || 0;
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                textBox.style.left = initialX + (e.clientX - startX) + 'px';
+                textBox.style.top = initialY + (e.clientY - startY) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => isDragging = false);
+
+            let isResizing = false;
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialX = textBox.offsetWidth;
+                initialY = textBox.offsetHeight;
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                textBox.style.width = initialX + (e.clientX - startX) + 'px';
+                textBox.style.height = initialY + (e.clientY - startY) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => isResizing = false);
+
+            textBox.appendChild(deleteBtn);
+            textBox.appendChild(resizeHandle);
+            document.body.appendChild(textBox);
+        });
+
+        document.getElementById('debugBtn').addEventListener('click', () => {
+            debugMode = !debugMode;
+            document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
+            draw();
+        });
+
+        document.querySelectorAll('input:not(#R), select').forEach(element => {
+            element.addEventListener('change', draw);
+        });
+
+        // 初始化
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        document.getElementById('R').dataset.oldValue = 60;
+    </script>
+</body>
+</html>    

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>带电粒子在电磁场中运动的仿真模拟教学平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#FF7D00',
+                        accent: '#36D399',
+                        neutral: {
+                            100: '#F5F7FA',
+                            200: '#E5E6EB',
+                            300: '#C9CDD4',
+                            400: '#86909C',
+                            500: '#4E5969',
+                            600: '#272E3B',
+                            700: '#1D2129',
+                        }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .btn-hover {
+                @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+            }
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-2;
+            }
+            .fade-in {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .fullscreen {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 9999;
+                background-color: white;
+                overflow: auto;
+            }
+            .nav-active {
+                @apply bg-primary text-white;
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral-100 font-inter text-neutral-700 min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="bg-white shadow-md fixed w-full z-50 transition-all duration-300" id="navbar">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-atom text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-neutral-700">带电粒子在电磁场中运动的仿真模拟教学平台</h1>
+            </div>
+            <nav class="hidden md:flex items-center space-x-6">
+                <a href="#" class="text-neutral-600 hover:text-primary transition-colors">首页</a>
+                <a href="#" class="text-neutral-600 hover:text-primary transition-colors">帮助</a>
+                <a href="#" class="text-neutral-600 hover:text-primary transition-colors">关于</a>
+            </nav>
+            <button class="md:hidden text-neutral-700 text-xl" id="menu-toggle">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+        <!-- 移动端菜单 -->
+        <div class="md:hidden hidden bg-white w-full py-2 px-4 shadow-inner" id="mobile-menu">
+            <a href="#" class="block py-2 text-neutral-600 hover:text-primary transition-colors">首页</a>
+            <a href="#" class="block py-2 text-neutral-600 hover:text-primary transition-colors">帮助</a>
+            <a href="#" class="block py-2 text-neutral-600 hover:text-primary transition-colors">关于</a>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow pt-20 pb-10" id="main-content">
+        <div class="container mx-auto px-4">
+            <!-- 欢迎信息 -->
+            <section class="mb-10 text-center fade-in">
+                <h2 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-neutral-700 mb-4">带电粒子在电磁场中运动的仿真模拟教学平台</h2>
+                <p class="text-neutral-500 max-w-3xl mx-auto text-lg">探索带电粒子在电场和磁场中的运动规律，通过互动学习加深理解</p>
+            </section>
+
+            <!-- 程序列表 -->
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <!-- 知识梳理 -->
+                <div class="bg-white rounded-xl shadow-md overflow-hidden card-hover fade-in" style="animation-delay: 0.1s">
+                    <div class="h-4 bg-primary"></div>
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+                                <i class="fa-solid fa-book text-primary text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-neutral-700">知识梳理</h3>
+                                <p class="text-neutral-500 text-sm">knowledge.html</p>
+                            </div>
+                        </div>
+                        <p class="text-neutral-600 mb-6">系统梳理带电粒子在电场和磁场中的运动规律和相关概念。</p>
+                        <button id="run-knowledge" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg shadow transition-all duration-300 flex items-center justify-center btn-hover">
+                            <i class="fa-solid fa-play mr-2"></i> 开始学习
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 实验模拟 -->
+                <div class="bg-white rounded-xl shadow-md overflow-hidden card-hover fade-in" style="animation-delay: 0.2s">
+                    <div class="h-4 bg-secondary"></div>
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center mr-4">
+                                <i class="fa-solid fa-flask text-secondary text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-neutral-700">实验模拟</h3>
+                                <p class="text-neutral-500 text-sm">simulation.html</p>
+                            </div>
+                        </div>
+                        <p class="text-neutral-600 mb-6">通过互动模拟实验，观察带电粒子在不同场中的运动轨迹。</p>
+                        <button id="run-simulation" class="w-full bg-secondary hover:bg-secondary/90 text-white font-medium py-3 px-6 rounded-lg shadow transition-all duration-300 flex items-center justify-center btn-hover">
+                            <i class="fa-solid fa-play mr-2"></i> 开始模拟
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 方法讲解 -->
+                <div class="bg-white rounded-xl shadow-md overflow-hidden card-hover fade-in" style="animation-delay: 0.3s">
+                    <div class="h-4 bg-accent"></div>
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mr-4">
+                                <i class="fa-solid fa-lightbulb text-accent text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-neutral-700">方法讲解</h3>
+                                <p class="text-neutral-500 text-sm">method.html</p>
+                            </div>
+                        </div>
+                        <p class="text-neutral-600 mb-6">详细讲解解决带电粒子运动问题的思路和方法技巧。</p>
+                        <button id="run-method" class="w-full bg-accent hover:bg-accent/90 text-white font-medium py-3 px-6 rounded-lg shadow transition-all duration-300 flex items-center justify-center btn-hover">
+                            <i class="fa-solid fa-play mr-2"></i> 开始学习
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 三维运动 -->
+                <div class="bg-white rounded-xl shadow-md overflow-hidden card-hover fade-in" style="animation-delay: 0.4s">
+                    <div class="h-4 bg-neutral-500"></div>
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-neutral-500/10 rounded-full flex items-center justify-center mr-4">
+                                <i class="fa-solid fa-rocket text-neutral-500 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-neutral-700">三维运动</h3>
+                                <p class="text-neutral-500 text-sm">extension.html</p>
+                            </div>
+                        </div>
+                        <p class="text-neutral-600 mb-6">研究三维视角下带电粒子运动。</p>
+                        <button id="run-extension" class="w-full bg-neutral-500 hover:bg-neutral-600 text-white font-medium py-3 px-6 rounded-lg shadow transition-all duration-300 flex items-center justify-center btn-hover">
+                            <i class="fa-solid fa-play mr-2"></i> 开始学习
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-neutral-700 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i class="fa-solid fa-atom text-primary text-xl"></i>
+                        <h2 class="text-xl font-bold">带电粒子在电磁场中运动的仿真模拟教学平台</h2>
+                    </div>
+                    <p class="text-neutral-300 text-sm">探索微观世界的物理规律</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-neutral-300 hover:text-white transition-colors">
+                        <i class="fa-brands fa-github text-xl"></i>
+                    </a>
+                    <a href="#" class="text-neutral-300 hover:text-white transition-colors">
+                        <i class="fa-brands fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-neutral-300 hover:text-white transition-colors">
+                        <i class="fa-brands fa-linkedin text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-neutral-600 mt-6 pt-6 text-center text-neutral-400 text-sm">
+                <p>© 2025 带电粒子在电磁场中运动的仿真模拟教学平台. 保留所有权利.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 程序运行界面 -->
+    <div id="program-container" class="hidden fixed inset-0 z-50 bg-white">
+        <div class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
+            <div class="flex space-x-2">
+                <button id="nav-knowledge" class="bg-white hover:bg-primary/10 text-primary font-medium py-2 px-4 rounded-lg shadow transition-all duration-300 nav-active">
+                    知识梳理
+                </button>
+                <button id="nav-simulation" class="bg-white hover:bg-secondary/10 text-secondary font-medium py-2 px-4 rounded-lg shadow transition-all duration-300">
+                    实验模拟
+                </button>
+                <button id="nav-method" class="bg-white hover:bg-accent/10 text-accent font-medium py-2 px-4 rounded-lg shadow transition-all duration-300">
+                    方法讲解
+                </button>
+                <button id="nav-extension" class="bg-white hover:bg-neutral-500/10 text-neutral-500 font-medium py-2 px-4 rounded-lg shadow transition-all duration-300">
+                    三维运动
+                </button>
+            </div>
+            <button id="close-program" class="bg-neutral-800 hover:bg-neutral-700 text-white font-medium py-2 px-4 rounded-lg shadow transition-all duration-300 flex items-center btn-hover">
+                <i class="fa-solid fa-times mr-2"></i> 返回主页
+            </button>
+        </div>
+        <iframe id="program-frame" class="w-full h-full border-0 mt-16" sandbox="allow-same-origin allow-scripts"></iframe>
+    </div>
+
+    <!-- 脚本 -->
+    <script>
+        // 移动端菜单切换
+        const menuToggle = document.getElementById('menu-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        menuToggle.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // 导航栏滚动效果
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 10) {
+                navbar.classList.add('py-2', 'shadow-lg');
+                navbar.classList.remove('py-3', 'shadow-md');
+            } else {
+                navbar.classList.add('py-3', 'shadow-md');
+                navbar.classList.remove('py-2', 'shadow-lg');
+            }
+        });
+
+        // 获取DOM元素
+        const runKnowledge = document.getElementById('run-knowledge');
+        const runSimulation = document.getElementById('run-simulation');
+        const runMethod = document.getElementById('run-method');
+        const runExtension = document.getElementById('run-extension');
+        
+        const navKnowledge = document.getElementById('nav-knowledge');
+        const navSimulation = document.getElementById('nav-simulation');
+        const navMethod = document.getElementById('nav-method');
+        const navExtension = document.getElementById('nav-extension');
+        
+        const programFrame = document.getElementById('program-frame');
+        const programContainer = document.getElementById('program-container');
+        const closeProgram = document.getElementById('close-program');
+        const mainContent = document.getElementById('main-content');
+        const footer = document.querySelector('footer');
+
+        // 运行按钮事件
+        runKnowledge.addEventListener('click', () => {
+            loadProgram('knowledge.html', 'nav-knowledge');
+        });
+
+        runSimulation.addEventListener('click', () => {
+            loadProgram('simulation.html', 'nav-simulation');
+        });
+
+        runMethod.addEventListener('click', () => {
+            loadProgram('method.html', 'nav-method');
+        });
+
+        runExtension.addEventListener('click', () => {
+            loadProgram('extension.html', 'nav-extension');
+        });
+
+        // 导航按钮事件
+        navKnowledge.addEventListener('click', () => {
+            loadProgram('knowledge.html', 'nav-knowledge');
+        });
+
+        navSimulation.addEventListener('click', () => {
+            loadProgram('simulation.html', 'nav-simulation');
+        });
+
+        navMethod.addEventListener('click', () => {
+            loadProgram('method.html', 'nav-method');
+        });
+
+        navExtension.addEventListener('click', () => {
+            loadProgram('extension.html', 'nav-extension');
+        });
+
+        // 关闭程序按钮事件
+        closeProgram.addEventListener('click', () => {
+            // 隐藏程序运行界面
+            programContainer.classList.add('hidden');
+            
+            // 显示主内容和页脚
+            mainContent.classList.remove('hidden');
+            footer.classList.remove('hidden');
+            
+            // 清除iframe内容
+            programFrame.src = 'about:blank';
+            
+            // 显示导航栏
+            navbar.classList.remove('hidden');
+            
+            // 平滑滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // 加载程序到iframe
+        function loadProgram(fileName, activeNavId) {
+            // 隐藏主内容和页脚
+            mainContent.classList.add('hidden');
+            footer.classList.add('hidden');
+            
+            // 显示程序运行界面
+            programContainer.classList.remove('hidden');
+            
+            // 隐藏导航栏
+            navbar.classList.add('hidden');
+            
+            // 更新导航按钮状态
+            updateNavButtons(activeNavId);
+            
+            // 获取iframe的内容文档
+            const iframeDoc = programFrame.contentDocument || programFrame.contentWindow.document;
+            
+            // 写入加载动画内容（避免直接设置src触发路径解析）
+            iframeDoc.open();
+            iframeDoc.write(`
+                <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            body {
+                                margin: 0;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                background-color: #f5f7fa;
+                                font-family: 'Inter', sans-serif;
+                            }
+                            .loader {
+                                text-align: center;
+                            }
+                            .spinner {
+                                width: 60px;
+                                height: 60px;
+                                border: 5px solid rgba(22, 93, 255, 0.3);
+                                border-radius: 50%;
+                                border-top-color: #165DFF;
+                                animation: spin 1s linear infinite;
+                                margin: 0 auto 20px;
+                            }
+                            @keyframes spin {
+                                to { transform: rotate(360deg); }
+                            }
+                            p {
+                                color: #4E5969;
+                                font-size: 1.2rem;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="loader">
+                            <div class="spinner"></div>
+                            <p>正在加载内容...</p>
+                        </div>
+                    </body>
+                </html>
+            `);
+            iframeDoc.close(); // 关闭文档流确保显示
+            
+            // 延迟加载实际内容，让用户看到加载动画
+            setTimeout(() => {
+                programFrame.src = fileName;
+            }, 100); // 缩短延迟避免卡顿
+        }
+
+        // 更新导航按钮状态
+        function updateNavButtons(activeNavId) {
+            // 重置所有导航按钮
+            const navButtons = [navKnowledge, navSimulation, navMethod, navExtension];
+            navButtons.forEach(button => {
+                button.classList.remove('nav-active');
+                button.classList.add('bg-white');
+            });
+            
+            // 设置活动导航按钮
+            const activeButton = document.getElementById(activeNavId);
+            activeButton.classList.add('nav-active');
+            activeButton.classList.remove('bg-white');
+        }
+    </script>
+</body>
+</html>
